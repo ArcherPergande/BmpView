@@ -5,6 +5,7 @@ A simple UEFI image viewer for the bmp file format.
 Installation (SUPPORTS X64 ONLY)
 -----------------------------------------------------
 A. Download the pre-built binary from a release.
+
 B. Copy source to edk2 root and execute “build -p BmpView/BmpView.dsc”
 
 Usage
