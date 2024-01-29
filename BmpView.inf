@@ -1,0 +1,35 @@
+[Defines]
+  INF_VERSION                    = 1.27
+  BASE_NAME                      = BmpView
+  FILE_GUID                      = 1561ec03-0df3-443d-8644-8c0b11f6cb08
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = ShellCEntryLib
+
+[Sources]
+  Bmp/BmpOpen.c
+  Bmp/BmpClose.c
+  Bmp/BmpBitmapNew.c
+  Bmp/BmpBitmapFree.c
+  Bmp/BmpBitmapLoad.c
+  Bmp/BmpBitmapCopy.c
+
+  Screen/ScreenSave.c
+  Screen/ScreenRestore.c
+  Screen/ScreenFree.c
+  Screen/ScreenBlackout.c
+  Screen/ScreenInit.c
+  Screen/ScreenFini.c
+
+  Util/KeyboardGetCallback.c
+
+  Src/Main.c
+
+[Packages]
+  BmpView/BmpView.dec
+  
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  ShellLib
+  ShellCEntryLib
