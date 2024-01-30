@@ -141,8 +141,3 @@ INTN EFIAPI ShellAppMain(IN UINTN Argc, IN CHAR16 **Argv) {
     BmpClose(&Bmp);
     return Status;
 }
-
-/*
-qemu-system-x86_64 -smp 4 -s -bios OVMF.fd -drive format=raw,file=fat:rw:Build/DEBUG_GCC5/X64/BmpView/BmpView/DEBUG -display gtk,show-cursor=on,show-tabs=on -net none
-
-*/
