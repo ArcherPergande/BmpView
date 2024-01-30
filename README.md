@@ -2,6 +2,8 @@
 # BmpView
 A simple UEFI image viewer for the bmp file format.
 
+![Hello world](https://github.com/ArcherPergande/BmpView/blob/main/Images/HelloWorld.bmp?raw=true)
+
 Installation (SUPPORTS X64 ONLY)
 -----------------------------------------------------
 A. Download the pre-built binary from a release.
