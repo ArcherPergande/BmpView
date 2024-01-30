@@ -1,6 +1,6 @@
 
 # BmpView
-A simple UEFI image viewer for the bmp file format. Supports uncompressed 1, 4, 8, 16, and 24 bit depths.
+A simple UEFI image viewer for the bmp file format.
 
 ![Hello world](https://github.com/ArcherPergande/BmpView/blob/main/Images/HelloWorld.bmp?raw=true)
 
