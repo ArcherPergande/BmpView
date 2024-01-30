@@ -14,6 +14,8 @@ Usage
 -----------------------------------------------------
 In the UEFI shell run “BmpView FILE_NAME.bmp” to open an image. Once an image is open ESC terminates the program while the left, right, up, and down arrow keys are used for navigation.
 
+![Example usage](https://drive.google.com/file/d/1ywbdd5GmYZIbKE3x6x_QpI2ebfBSbYoU/view?usp=sharing)
+
 Dependencies
 -----------------------------------------------------
 1. EDK2 (Building)
