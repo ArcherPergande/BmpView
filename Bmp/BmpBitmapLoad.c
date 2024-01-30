@@ -6,116 +6,6 @@
 
 #include <Bmp.h>
 
-/*
-i need to adjust the bit ordering when i am reading from a bitmap with bitsperpixel of 1 or 4
-and StartX or NumPixels is not a multiple of 8
-
-BmpBitmapLoadRaw will deal with the scanline padding
-
-Mono
-    X
-1 0 1 1 0 0 1 0   1 1 1 0 0 1 0 0
-    Byte 1             Byte 2
-
-BitsToShift = 2
-
-
-
-STEP 1:
-Shift the first byte to the left by the required amount
-such that X is the first bit in the byte. The previous bits that were shifted to the end
-have to be masked out.
-
-Byte 1 << BitsToShift
-
-X
-1 1 0 0 1 0 1 0    1 1 1 0 0 1 0 0
-    Byte 1             Byte 2
-
-
-STEP 2:
-Shift the second byte to the right by 8 - BitsToShift. That way the next starting bits align
-with the position in the first bit to be transferred over. All bits 
-
-X
-1 1 0 0 1 0 1 0   1 0 0 1 0 0 1 1             
-    Byte 1           Byte 2
-
-
-NORMAL:
-
-0 0 0 0 0 0 0 0 0 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 1 1 1 1 1 1 1 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 1 0 0 0 0 0 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 1 0 1 1 1 1 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 1 0 1 0 0 1 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 1 0 1 0 0 1 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 1 0 1 1 1 1 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 1 0 0 0 0 0 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 1 1 1 1 1 1 1 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 0 0 0 0 0 0 0 0 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-
-0   0   | 0 0
-127 128 | 0 0
-64  128 | 0 0
-94  128 | 0 0
-82  128 | 0 0
-82  128 | 0 0
-94  128 | 0 0
-64  128 | 0 0
-127 128 | 0 0
-0   0   | 0 0
-
-X OFFSET 1:
-
-0 0 0 0 0 0 0 0 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-1 1 1 1 1 1 1 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-1 0 0 0 0 0 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-1 0 1 1 1 1 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-1 0 1 0 0 1 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-1 0 1 0 0 1 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-1 0 1 1 1 1 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-1 0 0 0 0 0 0 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-1 1 1 1 1 1 1 1 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 0 0 0 0 0 0 0 0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-
-0   0 | 0 0
-255 0 | 0 0
-129 0 | 0 0
-189 0 | 0 0
-165 0 | 0 0
-165 0 | 0 0
-189 0 | 0 0
-129 0 | 0 0
-255 0 | 0 0
-0   0 | 0 0
-
-something is definitely wrong with determining the last one in AlignRawBuffer
-
-OK TIME TO WRITE OUT WHAT THIS SHIT LOOKS LIKE IN MEMORY FUCK MY LIFE
-
-1:  {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} | 0 0
-2:  {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} | 0 0
-3:  {  0, 255,   0} {255, 255, 255} {  0, 255,   0} {255, 255, 255} {  0, 255,   0} {255, 255, 255} {  0, 255,   0} {255, 255, 255} {  0, 255,   0} {255, 255, 255} | 0 0
-4:  {255, 255, 255} {  0,   0, 255} {255, 255, 255} {  0,   0, 255} {255, 255, 255} {  0,   0, 255} {255, 255, 255} {  0,   0, 255} {255, 255, 255} {  0,   0, 255} | 0 0
-5:  {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} | 0 0
-6:  {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} | 0 0
-7:  {  0, 255,   0} {255, 255, 255} {  0, 255,   0} {255, 255, 255} {  0, 255,   0} {255, 255, 255} {  0, 255,   0} {255, 255, 255} {  0, 255,   0} {255, 255, 255} | 0 0
-8:  {255, 255, 255} {  0,   0, 255} {255, 255, 255} {  0,   0, 255} {255, 255, 255} {  0,   0, 255} {255, 255, 255} {  0,   0, 255} {255, 255, 255} {  0,   0, 255} | 0 0
-9:  {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} {  0,   0,   0} {255, 255, 255} | 0 0
-10: {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} {255, 255, 255} {255,   0,   0} | 0 0
-
-// Allocates an empty bitmap.
-EFIAPI BMP_BITMAP *BmpBitmapNew(UINT32 Width, UINT32 Height);
-
-// Frees an existing bitmap.
-EFIAPI VOID BmpBitmapFree(BMP_BITMAP *Bmp);
-
-// Parses data from the bmp file to a bitmap object. If Bitmap is NULL a new Bitmap is allocated
-EFIAPI EFI_STATUS BmpBitmapLoad(BMP_FILE *Bmp, BMP_BITMAP **Bitmap, UINT32 X, UINT32 Y, UINT32 Width, UINT32 Height);
-
-*/
-
 EFIAPI STATIC VOID AlignRawBuffer(UINT8 *RawBuffer, UINTN Size, UINT32 StartX, UINT16 BitsPerPixel) {
     UINT8 BitsToShift = (BitsPerPixel == BMP_FORMAT_PALLET4) ? 4 : StartX % 8;
     if (BitsPerPixel <= 4 && BitsPerPixel) {
@@ -152,7 +42,6 @@ EFIAPI STATIC EFI_STATUS ReadRow(BMP_FILE *Bmp, UINT8 *Raw, UINT32 Row, UINT32 S
     return Status;
 }
 
-// these fuckers need to be changed so they read the raw data inside the function and not outside it
 EFIAPI STATIC VOID Rgb24ToBlt(BMP_FILE *Bmp, UINT8 *Raw, EFI_GRAPHICS_OUTPUT_BLT_PIXEL *Blt, UINT32 Width, UINT32 Height) {
     UINT32 Index;
     BMP_RGB24 *Row;
@@ -208,8 +97,6 @@ EFIAPI STATIC VOID PalletToBlt(BMP_FILE *Bmp, UINT8 *Raw, EFI_GRAPHICS_OUTPUT_BL
 }
 
 // should work with overlapping Dst and Src bitmaps
-
-
 EFIAPI STATIC inline EFI_STATUS ParseBitmap(BMP_FILE *Bmp, BMP_BITMAP *Bitmap, UINT32 X, UINT32 Y, UINT32 Width, UINT32 Height) {
     if (!Bmp || !Bitmap) {
         return EFI_INVALID_PARAMETER;
