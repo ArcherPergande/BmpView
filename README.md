@@ -16,6 +16,8 @@ In the UEFI shell run “BmpView FILE_NAME.bmp” to open an image. Once an imag
 
 Example: https://www.youtube.com/watch?v=txKM7doz0LU
 
+[![UEFI shell example](https://img.youtube.com/vi/txKM7doz0LU/0.jpg)](https://www.youtube.com/watch?v=txKM7doz0LU)
+
 Dependencies
 -----------------------------------------------------
 1. EDK2 (Building)
