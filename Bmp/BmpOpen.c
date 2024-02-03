@@ -5,9 +5,10 @@
 #include <Library/UefiRuntimeServicesTableLib.h>
 
 #include <Bmp.h>
+#include <Util.h>
 
 /* Parses a path and returns its volume index and relative counterpart (returns -1 for invalid/relative paths) */
-INTN PathToVolumeIndex(CHAR16 *Path, CHAR16 **Relative) {
+EFIAPI STATIC INTN PathToVolumeIndex(CHAR16 *Path, CHAR16 **Relative) {
     INTN Count = -1, Index = 2;
     if (CharToUpper(Path[0]) == L'F' && CharToUpper(Path[1]) == L'S' && Path[2] != L'\0') {
         Count = 0;
@@ -27,6 +28,53 @@ INTN PathToVolumeIndex(CHAR16 *Path, CHAR16 **Relative) {
     }
     
     return Count;
+}
+
+/* return must be gBS->Free()'d*/
+EFIAPI STATIC CHAR16 *CpyShellVar(const CHAR16 *EnvKey) {
+    const CHAR16 *Source = ShellGetEnvironmentVariable(EnvKey);
+    if (!Source) {
+        return NULL;
+    }
+
+    CHAR16 *Dest = NULL;
+    UINTN Length = StrLen(Source)+1; // Null term
+    if (gBS->AllocatePool(EfiLoaderData,Length*sizeof(CHAR16),(VOID*)&Dest) == EFI_SUCCESS) {
+        StrCpyS(Dest,Length,Source);
+    }
+
+    return Dest;
+}
+
+EFIAPI STATIC UINTN ShellPathGet(CHAR16 ***Path) {
+    CHAR16 *Raw = CpyShellVar(L"path");
+    UINTN Count = StrCount(Raw,L';')+1; // +1 cus there is always one less ';' than paths ("FSO:\folder;FS1:\folder" - 2 paths and 1 ';')
+    EFI_STATUS Status = gBS->AllocatePool(EfiLoaderData,Count*sizeof(CHAR16*),(VOID**)Path);
+    if (Status != EFI_SUCCESS) {
+        *Path = NULL;
+        return 0;
+    }
+
+    (*Path)[0] = Raw; // [] comes before * in order of operations
+    UINTN Cur = 0, Index = 1;
+    while (Index <= Count) {
+        if (Raw[Cur] == L';') {
+            Raw[Cur] = L'\0';
+            (*Path)[Index] = &Raw[Cur+1];
+            Index++;
+        }
+        Cur++;
+    }
+
+    return Count;
+}
+
+EFIAPI STATIC VOID ShellPathFree(CHAR16 **Path) {
+    if (Path) {
+        gBS->FreePool(Path[0]);
+        gBS->FreePool(Path);
+    }
+    return;
 }
 
 EFIAPI STATIC EFI_STATUS ReadHeader(SHELL_FILE_HANDLE FileHandle, BMP_HEADER *Header) {
