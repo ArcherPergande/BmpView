@@ -1,9 +1,33 @@
 #include <Uefi.h>
+#include <Library/UefiLib.h>
 #include <Library/ShellLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 
 #include <Bmp.h>
+
+/* Parses a path and returns its volume index and relative counterpart (returns -1 for invalid/relative paths) */
+INTN PathToVolumeIndex(CHAR16 *Path, CHAR16 **Relative) {
+    INTN Count = -1, Index = 2;
+    if (CharToUpper(Path[0]) == L'F' && CharToUpper(Path[1]) == L'S' && Path[2] != L'\0') {
+        Count = 0;
+        while (Path[Index] != L':') {
+            if (Path[Index] == L'\0') {
+                Count = -1;
+                break;
+            }
+            else {
+                Count = Count * 10 + (Path[Index] - L'0');
+            }
+            Index++;
+        }
+        if (Relative) {
+            *Relative = &Path[Index+1];
+        }
+    }
+    
+    return Count;
+}
 
 EFIAPI STATIC EFI_STATUS ReadHeader(SHELL_FILE_HANDLE FileHandle, BMP_HEADER *Header) {
     if (!Header) {
