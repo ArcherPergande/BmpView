@@ -22,6 +22,7 @@
   Screen/ScreenFini.c
 
   Util/KeyboardGetCallback.c
+  Util/StrCount.c
 
   Src/Main.c
 
