@@ -17,4 +17,6 @@ KeyBind index that was executed starting from 1. Index 0 is interpreted as the d
 and is used to exit the callback environment.
 */
 EFIAPI EFI_STATUS KeyboardGetCallback(KEYBOARD_CALLBACK *KeyBinds, VOID *Param, UINTN *Index, UINTN Count);
+EFIAPI STATIC UINTN StrCount(const CHAR16 *Str, CHAR16 Key);
+
 #endif // __BMPVIEW_UTIL_H__
