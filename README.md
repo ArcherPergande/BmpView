@@ -21,4 +21,4 @@ https://www.youtube.com/watch?v=txKM7doz0LU
 Dependencies
 -----------------------------------------------------
 1. EDK2 (Building)
-2. UEFI Shell Environment (Runtime)
+2. UEFI Shell Environment (Recommended Runtime)
