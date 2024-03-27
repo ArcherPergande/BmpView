@@ -2,142 +2,186 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 #include <Library/UefiLib.h>
-#include <Library/ShellLib.h>
-#include <Library/ShellCEntryLib.h>
 
-#include <Bmp.h>
+#include <Protocol/SimpleFileSystem.h>
+#include <Protocol/LoadedImage.h>
+
+#include <../Include/Bmp.h>
+#include <LoadOptions.h>
 #include <Screen.h>
-#include <Util.h>
+#include <StatusBar.h>
 
-#define SCROLL_AMOUNT 15
+#define SCROLL 30
 
-BMP_FILE Bmp;
-BMP_BITMAP *Bitmap = NULL;
-UINT32 CurX = 0, CurY = 0;
-
-EFIAPI EFI_STATUS ShiftRight(VOID *) {
-    UINT32 Stop = Bmp.Header.Info.Width - Bitmap->Width;
-    if (CurX + SCROLL_AMOUNT >= Stop) {
-        return EFI_SUCCESS;
-    }
-
-    CurX += (CurX + SCROLL_AMOUNT < Stop) ? SCROLL_AMOUNT : Stop - CurX;
-    EFI_STATUS Status = BmpBitmapLoad(&Bmp,&Bitmap,CurX,CurY,0,0,Bitmap->Width,Bitmap->Height);
-    if (Status != EFI_SUCCESS) {
-        return Status;
-    }
-    else {
-        return ScreenPrint(Bitmap->Buffer,0,0,0,0,Bitmap->Width,Bitmap->Height);
-    }
-}
-
-EFIAPI EFI_STATUS ShiftLeft(VOID *) {
-    if (CurX == 0) {
-        return EFI_SUCCESS;
-    }
-
-    CurX -= (CurX - SCROLL_AMOUNT > 0) ? SCROLL_AMOUNT : CurX;
-    EFI_STATUS Status = BmpBitmapLoad(&Bmp,&Bitmap,CurX,CurY,0,0,Bitmap->Width,Bitmap->Height);
-    if (Status != EFI_SUCCESS) {
-        return Status;
-    }
-    else {
-        return ScreenPrint(Bitmap->Buffer,0,0,0,0,Bitmap->Width,Bitmap->Height);
-    }
-}
-
-EFIAPI EFI_STATUS ShiftDown(VOID *) {
-    UINT32 Stop = Bmp.Header.Info.Height - Bitmap->Height;
-    if (CurY + SCROLL_AMOUNT >= Stop) {
-        return EFI_SUCCESS;
-    }
-
-    CurY += (CurY + SCROLL_AMOUNT < Stop) ? SCROLL_AMOUNT : Stop - CurY;
-    EFI_STATUS Status = BmpBitmapLoad(&Bmp,&Bitmap,CurX,CurY,0,0,Bitmap->Width,Bitmap->Height);
-    if (Status != EFI_SUCCESS) {
-        return Status;
-    }
-    else {
-        return ScreenPrint(Bitmap->Buffer,0,0,0,0,Bitmap->Width,Bitmap->Height);
-    }
-}
-
-EFIAPI EFI_STATUS ShiftUp(VOID *) {
-    if (CurY == 0) {
-        return EFI_SUCCESS;
+BMP_BITMAP *LoadBitmap(BMP_FILE *Bmp) {
+    if (!Bmp) {
+        return NULL;
     }
     
-    CurY -= (CurY - SCROLL_AMOUNT > 0) ? SCROLL_AMOUNT : CurY;
-    EFI_STATUS Status = BmpBitmapLoad(&Bmp,&Bitmap,CurX,CurY,0,0,Bitmap->Width,Bitmap->Height);
-    if (Status != EFI_SUCCESS) {
-        return Status;
+    // Allocate everything needed
+    EFI_GRAPHICS_OUTPUT_BLT_PIXEL Scheme[2] = {{255,255,255,0},{145,145,145,0}};
+    BMP_BITMAP *Bitmap = BmpBitmapNew(Bmp->Header.Info.Width,Bmp->Header.Info.Height);
+    BMP_BITMAP *Temp = BmpBitmapNew(Bmp->Header.Info.Width,1);
+    STATUS_BAR *Bar = StatusBarCreate(25,50,50,3,Scheme);
+    if ( !Bitmap || !Temp || !Bar) {
+        goto error;
     }
-    else {
-        return ScreenPrint(Bitmap->Buffer,0,0,0,0,Bitmap->Width,Bitmap->Height);
+
+    // Read bitmap by rows and increment the status bar
+    EFI_STATUS Status;
+    UINTN Percentage;
+    for (UINT32 Row = 0; Row < Bitmap->Height; Row++) {
+        Percentage = (Row * 100) / Bitmap->Height;
+        StatusBarUpdate(Bar,Percentage);
+        Status = BmpBitmapLoad(Bmp,Temp,0,Row);
+        if (Status == EFI_SUCCESS) {
+            gBS->CopyMem(&Bitmap->Buffer[Row * Bitmap->Width],Temp->Buffer,Bitmap->Width*sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
+        }
+        else {
+            break;
+        }
     }
+    if (Status == EFI_SUCCESS) {
+        StatusBarUpdate(Bar,100);
+        gBS->FreePool(Bar);
+        gBS->FreePool(Temp);
+        return Bitmap;
+    }
+
+    error:
+    gBS->FreePool(Bar);
+    gBS->FreePool(Temp);
+    gBS->FreePool(Bitmap);
+    return NULL;
 }
 
-EFIAPI EFI_STATUS Init() {
-    UINT32 Width = (Bmp.Header.Info.Width > gGop->Mode->Info->HorizontalResolution) ? gGop->Mode->Info->HorizontalResolution : 0;
-    UINT32 Height = (Bmp.Header.Info.Height > gGop->Mode->Info->VerticalResolution) ? gGop->Mode->Info->VerticalResolution : 0;
-    EFI_STATUS Status = BmpBitmapLoad(&Bmp,&Bitmap,CurX,CurY,0,0,Width,Height);
-    if (Status != EFI_SUCCESS) {
-        return Status;
+EFI_STATUS PrintBitmap(BMP_BITMAP *Bitmap, UINT32 SrcX, UINT32 SrcY) {
+    UINT32 TruncatedWidth = gGop->Mode->Info->HorizontalResolution;
+    UINT32 TruncatedHeight = gGop->Mode->Info->VerticalResolution;
+    UINT32 DstX = 0, DstY = 0;
+
+    // Truncate the width and center on x axis
+    if (TruncatedWidth > Bitmap->Width) {
+        SrcX = 0;
+        TruncatedWidth = Bitmap->Width;
+        DstX = (gGop->Mode->Info->HorizontalResolution / 2) - (Bitmap->Width / 2);
     }
-    else {
-        return ScreenPrint(Bitmap->Buffer,0,0,0,0,Bitmap->Width,Bitmap->Height);
+
+    // Truncate the height and center on y axis
+    if (TruncatedHeight > Bitmap->Height) {
+        SrcY = 0;
+        TruncatedHeight = Bitmap->Height;
+        DstY = (gGop->Mode->Info->VerticalResolution / 2) - (Bitmap->Height / 2);
     }
+
+    return gGop->Blt(gGop,Bitmap->Buffer,EfiLoaderData,SrcX,SrcY,DstX,DstY,TruncatedWidth,TruncatedHeight,Bitmap->Width*sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL));
 }
 
-EFIAPI INTN Runtime() {
-    INTN Retval = 0;
-    KEYBOARD_CALLBACK KeyBinds[] = {
-        {{SCAN_RIGHT,0},ShiftRight},
-        {{SCAN_LEFT,0},ShiftLeft},
-        {{SCAN_DOWN,0},ShiftDown},
-        {{SCAN_UP,0},ShiftUp}
-    };
-
-    if (ScreenInit() != EFI_SUCCESS || Init() != EFI_SUCCESS) {
-        Retval = 1;
-        goto end;
+EFIAPI EFI_STATUS UpdatePosition(BMP_BITMAP *Bitmap, INTN *X, INTN *Y, EFI_INPUT_KEY *Key) {
+    // Update coords
+    INTN Stop = 0;
+    if (Key->ScanCode == SCAN_RIGHT && Bitmap->Width > gGop->Mode->Info->HorizontalResolution) {
+        Stop = Bitmap->Width - gGop->Mode->Info->HorizontalResolution;
+        *X += (*X + SCROLL < Stop) ? SCROLL : Stop - *X;
+    }
+    else if (Key->ScanCode == SCAN_DOWN && Bitmap->Height > gGop->Mode->Info->VerticalResolution) {
+        Stop = Bitmap->Height - gGop->Mode->Info->VerticalResolution;
+        *Y += (*Y + SCROLL < Stop) ? SCROLL : Stop - *Y;
+    }
+    else if (Key->ScanCode == SCAN_LEFT) {
+        Stop = 1;
+        *X -= (*X - SCROLL > 0) ? SCROLL : *X;
+    }
+    else if (Key->ScanCode == SCAN_UP) {
+        Stop = 1;
+        *Y -= (*Y - SCROLL > 0) ? SCROLL : *Y;
     }
 
-    UINTN Index;
-    EFI_STATUS Status = KeyboardGetCallback(KeyBinds,NULL,&Index,4);
-    if (Status != EFI_SUCCESS && Index != 0) {
-        Retval = 2;
-        goto end;
+    // Print if changed
+    if (Stop) {
+        return PrintBitmap(Bitmap,*X,*Y);
     }
-    
-    end:
-    BmpBitmapFree(Bitmap);
-    ScreenFini();
-    return Retval;
+    return EFI_SUCCESS;
 }
 
-INTN EFIAPI ShellAppMain(IN UINTN Argc, IN CHAR16 **Argv) {
-    // Determine if a valid argument was passed
-    if (Argc < 2) {
-        Print(L"ERROR: No file path was specified.\r\nUSAGE: Img Folder/Image.bmp\r\n");
+/*
+wtf is wrong with the large bitmap buffer not rendering correctly??????
+the issue is with printing with Blt()
+the only thing that is different is the fucking delta
+
+3 options:
+figure out wtf is wrong with delta and try to fix it
+create a double buffer and print without delta
+print row by row without delta (worse than double buffer)
+*/
+EFIAPI EFI_STATUS UefiMain(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
+    // Get user parameters (needs manual input option)
+    CHAR16 *Path = LoadOptionsNext(LoadOptionsGet(NULL),NULL);
+    if (!Path) {
+        gST->ConOut->OutputString(gST->ConOut,L"ERROR: No file path specified\r\n");
         return EFI_INVALID_PARAMETER;
     }
 
-    // Attempt to open the file specified
-    EFI_STATUS Status = BmpOpen(Argv[Argc-1],&Bmp);
+    // Open the file
+    BMP_FILE Bmp;
+    EFI_STATUS Status = BmpOpen(Path,&Bmp);
     if (Status == EFI_UNSUPPORTED) {
-        Print(L"ERROR: Incompatible file format. Only BMP files are supported.\r\n");
+        gST->ConOut->OutputString(gST->ConOut,L"ERROR: Incompatible file format. Only BMP files are supported.\r\n");
         return Status;
     }
     else if (Status != EFI_SUCCESS) {
-        Print(L"ERROR: Failed to open the file specified.\r\n");
+        gST->ConOut->OutputString(gST->ConOut,L"ERROR: Failed to open/read file specified\r\n");
+        return Status;
+    }
+
+    // Initialize the screen
+    Status = ScreenInit();
+    if (Status != EFI_SUCCESS) {
+        gST->ConOut->OutputString(gST->ConOut,L"ERROR: Failed to initialize screen. Graphics Output Protocol may be missing.\r\n");
+        return Status;
+    }
+
+    // Load and print the bitmap
+    INTN X = 0, Y = 0;
+    BMP_BITMAP *Bitmap = LoadBitmap(&Bmp);
+    if (!Bitmap) {
+        gST->ConOut->OutputString(gST->ConOut,L"ERROR: Out of resources.\r\n");
+        return EFI_OUT_OF_RESOURCES;
+    }
+
+    ScreenBlackout();
+    Status = PrintBitmap(Bitmap,X,Y);
+    if (Status != EFI_SUCCESS) {
+        gST->ConOut->OutputString(gST->ConOut,L"ERROR: Failed to fetch bitmap.\r\n");
         return Status;
     }
     
-    Status = Runtime();
-    if (Status != EFI_SUCCESS) {
-        Print(L"fml\r\n");
+    // Runtime loop
+    UINTN Index;
+    EFI_INPUT_KEY Key;
+    while (TRUE) {
+        gBS->WaitForEvent(1,&gST->ConIn->WaitForKey,&Index);
+        Status = gST->ConIn->ReadKeyStroke(gST->ConIn,&Key);
+        if (Status != EFI_SUCCESS || Key.ScanCode == SCAN_ESC) {
+            break;
+        }
+
+        Status = UpdatePosition(Bitmap,&X,&Y,&Key);
+        if (Status != EFI_SUCCESS) {
+            break;
+        }
     }
+    if (Status != EFI_SUCCESS) {
+        gST->ConOut->OutputString(gST->ConOut,L"ERROR: ???\r\n");
+    }
+ 
+    gBS->FreePool(Bitmap);
     BmpClose(&Bmp);
+    ScreenFini();
     return Status;
 }
+
+/*
+qemu-system-x86_64 -smp 4 -s -bios OVMF.fd -drive format=raw,file=fat:rw:Build/DEBUG_GCC5/X64/BmpView/BmpView/DEBUG -drive format=raw,file=fat:rw:Build/DEBUG_GCC5/X64/BmpView/BmpView/OUTPUT -display gtk,show-cursor=on,show-tabs=on -net none
+
+*/

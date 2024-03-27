@@ -1,5 +1,4 @@
 #include <Uefi.h>
-#include <Library/ShellLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 
@@ -7,7 +6,7 @@
 
 EFIAPI VOID BmpClose(BMP_FILE *Bmp) {
     if (Bmp) {
-        ShellCloseFile(&Bmp->FileHandle);
+        Bmp->FileHandle->Close(Bmp->FileHandle);
         if (Bmp->Color.Table) {
             gBS->FreePool(Bmp->Color.Table);
         }

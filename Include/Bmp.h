@@ -3,8 +3,8 @@
 
 #include <Uefi.h>
 
-#include <Protocol/Shell.h>
 #include <Protocol/GraphicsOutput.h>
+#include <Protocol/SimpleFileSystem.h>
 
 #define BMP_COMPRESSION_NONE 0
 #define BMP_COMPRESSION_RLE8 1
@@ -108,7 +108,7 @@ typedef struct {
 
 // Info must always follow directly after Header
 typedef struct {
-    SHELL_FILE_HANDLE FileHandle;
+    EFI_FILE_PROTOCOL *FileHandle;
     BMP_HEADER Header;
     BMP_COLOR_TABLE Color;
     UINT32 Scanline;       
@@ -128,7 +128,6 @@ EFIAPI EFI_STATUS BmpOpen(CHAR16 *FilePath, BMP_FILE *Bmp);
 EFIAPI VOID BmpClose(BMP_FILE *Bmp);
 EFIAPI BMP_BITMAP *BmpBitmapNew(UINT32 Width, UINT32 Height);
 EFIAPI VOID BmpBitmapFree(BMP_BITMAP *Bitmap);
-EFIAPI EFI_STATUS BmpBitmapLoad(BMP_FILE *Bmp, BMP_BITMAP **Bitmap, UINT32 SrcX, UINT32 SrcY, UINT32 DstX, UINT32 DstY, UINT32 Width, UINT32 Height);
 EFIAPI EFI_STATUS BmpBitmapCopy(BMP_BITMAP *Dst, BMP_BITMAP *Src, UINT32 SrcX, UINT32 SrcY, UINT32 DstX, UINT32 DstY, UINT32 Width, UINT32 Height);
-
+EFIAPI EFI_STATUS BmpBitmapLoad(BMP_FILE *Bmp, BMP_BITMAP *Bitmap, UINT32 X, UINT32 Y);
 #endif //__BMPVIEW_BMP_H__

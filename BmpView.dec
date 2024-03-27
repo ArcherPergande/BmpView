@@ -15,4 +15,3 @@
 
 [LibraryClasses]
   ShellLib|Include/Library/ShellLib.h
-  ShellCEntryLib|Include/Library/ShellCEntryLib.h

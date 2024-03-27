@@ -4,7 +4,7 @@
   FILE_GUID                      = 1561ec03-0df3-443d-8644-8c0b11f6cb08
   MODULE_TYPE                    = UEFI_APPLICATION
   VERSION_STRING                 = 1.0
-  ENTRY_POINT                    = ShellCEntryLib
+  ENTRY_POINT                    = UefiMain
 
 [Sources]
   Bmp/BmpOpen.c
@@ -21,8 +21,13 @@
   Screen/ScreenInit.c
   Screen/ScreenFini.c
 
-  Util/KeyboardGetCallback.c
-  Util/StrCount.c
+  LoadOptions/LoadOptionsGet.c
+  LoadOptions/LoadOptionsGetManual.c
+  LoadOptions/LoadOptionsNext.c
+  LoadOptions/LoadOptionsExtract.c
+
+  StatusBar/StatusBarCreate.c
+  StatusBar/StatusBarUpdate.c
 
   Src/Main.c
 
@@ -33,4 +38,3 @@
   UefiApplicationEntryPoint
   UefiLib
   ShellLib
-  ShellCEntryLib
